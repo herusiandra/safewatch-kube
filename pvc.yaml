@@ -1,0 +1,148 @@
+# PVC untuk logs sws-srvc-license
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-license-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+
+---
+# PVC untuk logs sws-srvc-list
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-list-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+
+---
+# PVC untuk logs sws-srvc-archive
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-archive-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+
+---
+# PVC untuk logs sws-srvc-detection
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-detection-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+
+---
+# PVC untuk logs sws-srvc-detection-lock
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-detection-lock-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+
+---
+# PVC untuk logs sws-srvc-goodguy
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-goodguy-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+
+---
+# PVC untuk logs sws-srvc-user
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-user-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+
+---
+# PVC untuk logs sws-srvc-scan
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-scan-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+
+---
+# PVC untuk logs sws-srvc-scan-persistance
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-scan-persistence-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+
+---
+# PVC untuk logs sws-srvc-approval
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-approval-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn

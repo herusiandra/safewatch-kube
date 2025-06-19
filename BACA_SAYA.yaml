@@ -1,0 +1,58 @@
+# service: port
+license: 8081
+list:  8480
+archive: 8280
+detection: 9080
+detection-lock: ini belum
+goodguys:  8380
+user:  8780
+scan: 8680
+scan-persistance: 9180
+approval: 8980
+filebasedarchive:   
+ai:  11080
+
+#detail image:
+USER=jboss
+uid=185(jboss) gid=0(root) groups=0(root),185(jboss)
+/home/jboss
+/home/jboss/app/srvc-license-qk-5.1.9.jar
+/home/jboss/lib/boot
+/home/jboss/lib/main
+/home/jboss/quarkus
+/home/jboss/quarkus-run.jar
+
+#apiadapter
+/usr/bin/srvc-apiadapter.jar
+
+default: port untuk semua container 8180
+
+#untuk check heath report container
+curl http://localhost:8180/q/health 
+
+# service: port
+license: 8081
+list:  8480
+archive: 8280
+detection: 9080
+detection-lock: ini belum
+goodguys:  8380
+user:  8780
+scan: 8680
+scan-persistance: 9180
+approval: 8980
+filebasedarchive:   
+ai:  11080
+
+#detail image:
+USER=jboss
+uid=185(jboss) gid=0(root) groups=0(root),185(jboss)
+/home/jboss
+/home/jboss/app/srvc-license-qk-5.1.9.jar
+/home/jboss/lib/boot
+/home/jboss/lib/main
+/home/jboss/quarkus
+/home/jboss/quarkus-run.jar
+
+#apiadapter 8401
+/usr/bin/srvc-apiadapter.jar

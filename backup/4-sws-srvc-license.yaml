@@ -1,0 +1,952 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sws-kube
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: logs-sws-pv
+  labels:
+    type: local
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /var/log/swf
+    type: DirectoryOrCreate
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-license-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  volumeName: logs-sws-pv
+
+---
+# PVC untuk logs sws-srvc-list
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-list-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+
+---
+# PVC untuk logs sws-srvc-archive
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-archive-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+
+---
+# PVC untuk logs sws-srvc-detection
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-detection-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+
+---
+# PVC untuk logs sws-srvc-detection-lock
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-detection-lock-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+
+---
+# PVC untuk logs sws-srvc-goodguy
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-goodguy-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+
+---
+# PVC untuk logs sws-srvc-user
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-user-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+
+---
+# PVC untuk logs sws-srvc-scan
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-scan-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+
+---
+# PVC untuk logs sws-srvc-scan-persistance
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-scan-persistence-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+
+---
+# PVC untuk logs sws-srvc-approval
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-approval-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+
+---
+# ConfigMap berisi konfigurasi aplikasi sws-config
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sws-srvc-license-config
+  namespace: sws-kube
+data:
+  application.properties: |
+    zookeeper.connect-string=zookeeper-headless.sws-kube.svc.cluster.local:2181
+    kafka.bootstrap.servers=kafka-headless.sws-kube.svc.cluster.local:9092
+    %oracle.database.jdbc.scdb.url=jdbc:oracle:thin:@192.168.220.70:1521/safewatch
+    %oracle.database.jdbc.filtering.url=jdbc:oracle:thin:@192.168.220.70:1521/safewatch
+    %oracle.quarkus.datasource."scdbPU".username=scdb
+    %oracle.quarkus.datasource."scdbPU".password=47d65070cc33c31965ab8b61faf8078c
+    %oracle.quarkus.datasource."filteringPU".username=swserver
+    %oracle.quarkus.datasource."filteringPU".password=47d65070cc33c31965ab8b61faf8078c
+    quarkus.log.file.enable=true
+    quarkus.log.file.level=INFO
+    quarkus.log.file.rotation.max-file-size=100M
+    quarkus.log.file.rotation.max-backup-index=5
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sws-srvc-license
+  namespace: sws-kube
+  labels:
+    app: sws-srvc-license
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sws-srvc-license
+  template:
+    metadata:
+      labels:
+        app: sws-srvc-license
+    spec:
+      hostname: sws-srvc-license
+      containers:
+        - name: sws-srvc-license
+          image: eastnetsdemo/srvc-license:5.1.9-oracle
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8180
+          volumeMounts:
+            - name: config-volume
+              mountPath: /home/jboss/config/application.properties
+              subPath: application.properties
+            - name: log-volume
+              mountPath: /home/jboss/logs
+          env:
+            - name: TZ
+              value: "Asia/Jakarta"
+            - name: EASTNETS_CONFIG_HOME
+              value: "/etc"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=90"
+          resources:
+            limits:
+              memory: "1024Mi"
+            requests:
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /q/health/live
+              port: 8180
+              scheme: HTTP
+            initialDelaySeconds: 10
+            timeoutSeconds: 1
+            periodSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /q/health/ready
+              port: 8180
+              scheme: HTTP
+            initialDelaySeconds: 10
+            timeoutSeconds: 1
+            periodSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+      volumes:
+        - name: config-volume
+          configMap:
+            name: sws-srvc-license-config
+        - name: log-volume
+          persistentVolumeClaim:
+            claimName: logs-sws-license-pvc
+
+---
+# Service untuk sws-srvc-license
+apiVersion: v1
+kind: Service
+metadata:
+  name: sws-srvc-license
+  namespace: sws-kube
+spec:
+  selector:
+    app: sws-srvc-license
+  ports:
+    - protocol: TCP
+      port: 8180         # <-- port yang digunakan untuk akses dari luar (ClusterIP/NodePort/Ingress)
+      targetPort: 8180   # <-- port sebenarnya di dalam container
+  type: ClusterIP
+
+---
+# Deployment service sws-srvc-list
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sws-srvc-list
+  namespace: sws-kube
+  labels:
+    app: sws-srvc-list
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sws-srvc-list
+  template:
+    metadata:
+      labels:
+        app: sws-srvc-list
+    spec:
+      hostname: sws-srvc-list
+      securityContext:
+        fsGroup: 185
+      containers:
+        - name: sws-srvc-list
+          image: eastnetsdemo/srvc-list:5.1.9-oracle
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 185
+          ports:
+            - containerPort: 8480
+          volumeMounts:
+            - name: config-volume
+              mountPath: /home/jboss/config/application.properties
+              subPath: application.properties  
+            - name: log-volume
+              mountPath: /home/jboss/logs
+          env:
+            - name: TZ
+              value: "Asia/Jakarta"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=90"
+          resources:
+            limits:
+              memory: "1024Mi"
+            requests:
+              memory: "512Mi"
+          livenessProbe:
+            tcpSocket:
+              port: 8480
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            tcpSocket:
+              port: 8480
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+      volumes:
+        - name: config-volume
+          configMap:
+            name: sws-srvc-config
+        - name: log-volume
+          persistentVolumeClaim:
+            claimName: logs-sws-list-pvc
+
+---
+# Service untuk sws-srvc-list
+apiVersion: v1
+kind: Service
+metadata:
+  name: sws-srvc-list
+  namespace: sws-kube
+spec:
+  selector:
+    app: sws-srvc-list
+  ports:
+    - protocol: TCP
+      port: 8180        # <-- port yang digunakan untuk akses dari luar (ClusterIP/NodePort/Ingress)
+      targetPort: 8480  # <-- port sebenarnya di dalam container
+  type: ClusterIP
+
+---
+# Deployment service sws-srvc-archive
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sws-srvc-archive
+  namespace: sws-kube
+  labels:
+    app: sws-srvc-archive
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sws-srvc-archive
+  template:
+    metadata:
+      labels:
+        app: sws-srvc-archive
+    spec:
+      hostname: sws-srvc-archive
+      securityContext:
+        fsGroup: 185
+      containers:
+        - name: sws-srvc-archive
+          image: eastnetsdemo/srvc-archive:5.1.9-oracle
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 185
+          ports:
+            - containerPort: 8280
+          volumeMounts:
+            - name: config-volume
+              mountPath: /home/jboss/config/application.properties
+              subPath: application.properties  
+            - name: log-volume
+              mountPath: /home/jboss/logs
+          env:
+            - name: TZ
+              value: "Asia/Jakarta"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=90"
+          resources:
+            limits:
+              memory: "1024Mi"
+            requests:
+              memory: "512Mi"
+          livenessProbe:
+            tcpSocket:
+              port: 8280
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            tcpSocket:
+              port: 8280
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+      volumes:
+        - name: config-volume
+          configMap:
+            name: sws-srvc-config
+        - name: log-volume
+          persistentVolumeClaim:
+            claimName: logs-sws-archive-pvc
+
+---
+# Service untuk sws-srvc-archive
+apiVersion: v1
+kind: Service
+metadata:
+  name: sws-srvc-archive
+  namespace: sws-kube
+spec:
+  selector:
+    app: sws-srvc-archive
+  ports:
+    - protocol: TCP
+      port: 8180        # port yang akan diakses pod lain di cluster
+      targetPort: 8280  # port di dalam container
+  type: ClusterIP
+
+---
+# Deployment service sws-srvc-detection
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sws-srvc-detection
+  namespace: sws-kube
+  labels:
+    app: sws-srvc-detection
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sws-srvc-detection
+  template:
+    metadata:
+      labels:
+        app: sws-srvc-detection
+    spec:
+      hostname: sws-srvc-detection
+      securityContext:
+        fsGroup: 185
+      containers:
+        - name: sws-srvc-detection
+          image: eastnetsdemo/srvc-detection:5.1.9-oracle
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 185
+          ports:
+            - containerPort: 9080
+          volumeMounts:
+            - name: config-volume
+              mountPath: /home/jboss/config/application.properties
+              subPath: application.properties  
+            - name: log-volume
+              mountPath: /home/jboss/logs
+          env:
+            - name: TZ
+              value: "Asia/Jakarta"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=90"
+          resources:
+            limits:
+              memory: "1024Mi"
+            requests:
+              memory: "512Mi"
+          livenessProbe:
+            tcpSocket:
+              port: 9080
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            tcpSocket:
+              port: 9080
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+      volumes:
+        - name: config-volume
+          configMap:
+            name: sws-srvc-config
+        - name: log-volume
+          persistentVolumeClaim:
+            claimName: logs-sws-detection-pvc
+
+---
+# Service untuk sws-srvc-detection
+apiVersion: v1
+kind: Service
+metadata:
+  name: sws-srvc-detection
+  namespace: sws-kube
+spec:
+  selector:
+    app: sws-srvc-detection
+  ports:
+    - protocol: TCP
+      port: 8180        # port yang digunakan pod lain untuk akses
+      targetPort: 9080  # port di dalam container
+  type: ClusterIP
+
+---
+# Deployment service sws-srvc-goodguy
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sws-srvc-goodguy
+  namespace: sws-kube
+  labels:
+    app: sws-srvc-goodguy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sws-srvc-goodguy
+  template:
+    metadata:
+      labels:
+        app: sws-srvc-goodguy
+    spec:
+      hostname: sws-srvc-goodguy
+      securityContext:
+        fsGroup: 185
+      containers:
+        - name: sws-srvc-goodguy
+          image: eastnetsdemo/srvc-goodguy:5.1.9-oracle
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 185
+          ports:
+            - containerPort: 8380
+          volumeMounts:
+            - name: config-volume
+              mountPath: /home/jboss/config/application.properties
+              subPath: application.properties  
+            - name: log-volume
+              mountPath: /home/jboss/logs
+          env:
+            - name: TZ
+              value: "Asia/Jakarta"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=90"
+          resources:
+            limits:
+              memory: "1024Mi"
+            requests:
+              memory: "512Mi"
+          livenessProbe:
+            tcpSocket:
+              port: 8380
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            tcpSocket:
+              port: 8380
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+      volumes:
+        - name: config-volume
+          configMap:
+            name: sws-srvc-config
+        - name: log-volume
+          persistentVolumeClaim:
+            claimName: logs-sws-goodguy-pvc
+
+---
+# Service untuk sws-srvc-goodguy
+apiVersion: v1
+kind: Service
+metadata:
+  name: sws-srvc-goodguy
+  namespace: sws-kube
+spec:
+  selector:
+    app: sws-srvc-goodguy
+  ports:
+    - protocol: TCP
+      port: 8180        # port yang digunakan pod lain untuk akses
+      targetPort: 8380  # port di dalam container
+  type: ClusterIP
+
+---
+# Deployment service sws-srvc-user
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sws-srvc-user
+  namespace: sws-kube
+  labels:
+    app: sws-srvc-user
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sws-srvc-user
+  template:
+    metadata:
+      labels:
+        app: sws-srvc-user
+    spec:
+      hostname: sws-srvc-user
+      securityContext:
+        fsGroup: 185
+      containers:
+        - name: sws-srvc-user
+          image: eastnetsdemo/srvc-user:5.1.9-oracle
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 185
+          ports:
+            - containerPort: 8780
+          volumeMounts:
+            - name: config-volume
+              mountPath: /home/jboss/config/application.properties
+              subPath: application.properties  
+            - name: log-volume
+              mountPath: /home/jboss/logs
+          env:
+            - name: TZ
+              value: "Asia/Jakarta"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=90"
+          resources:
+            limits:
+              memory: "1024Mi"
+            requests:
+              memory: "512Mi"
+          livenessProbe:
+            tcpSocket:
+              port: 8780
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            tcpSocket:
+              port: 8780
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+      volumes:
+        - name: config-volume
+          configMap:
+            name: sws-srvc-config
+        - name: log-volume
+          persistentVolumeClaim:
+            claimName: logs-sws-user-pvc
+
+---
+# Service untuk sws-srvc-user
+apiVersion: v1
+kind: Service
+metadata:
+  name: sws-srvc-user
+  namespace: sws-kube
+spec:
+  selector:
+    app: sws-srvc-user
+  ports:
+    - protocol: TCP
+      port: 8180        # port yang digunakan pod lain untuk akses
+      targetPort: 8780  # port di dalam container
+  type: ClusterIP
+
+---
+# Deployment service sws-srvc-scan
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sws-srvc-scan
+  namespace: sws-kube
+  labels:
+    app: sws-srvc-scan
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sws-srvc-scan
+  template:
+    metadata:
+      labels:
+        app: sws-srvc-scan
+    spec:
+      hostname: sws-srvc-scan
+      securityContext:
+        fsGroup: 185
+      containers:
+        - name: sws-srvc-scan
+          image: eastnetsdemo/srvc-scan:5.1.9-oracle
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 185
+          ports:
+            - containerPort: 8680
+          volumeMounts:
+            - name: config-volume
+              mountPath: /home/jboss/config/application.properties
+              subPath: application.properties  
+            - name: log-volume
+              mountPath: /home/jboss/logs
+          env:
+            - name: TZ
+              value: "Asia/Jakarta"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=90"
+          resources:
+            limits:
+              memory: "1024Mi"
+            requests:
+              memory: "512Mi"
+          livenessProbe:
+            tcpSocket:
+              port: 8680
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            tcpSocket:
+              port: 8680
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+      volumes:
+        - name: config-volume
+          configMap:
+            name: sws-srvc-config
+        - name: log-volume
+          persistentVolumeClaim:
+            claimName: logs-sws-scan-pvc
+
+---
+# Service untuk sws-srvc-scan
+apiVersion: v1
+kind: Service
+metadata:
+  name: sws-srvc-scan
+  namespace: sws-kube
+spec:
+  selector:
+    app: sws-srvc-scan
+  ports:
+    - protocol: TCP
+      port: 8180        # port yang digunakan pod lain untuk akses
+      targetPort: 8680  # port di dalam container
+  type: ClusterIP
+
+---
+# Deployment service sws-srvc-scan-persistence
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sws-srvc-scan-persistence
+  namespace: sws-kube
+  labels:
+    app: sws-srvc-scan-persistence
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sws-srvc-scan-persistence
+  template:
+    metadata:
+      labels:
+        app: sws-srvc-scan-persistence
+    spec:
+      hostname: sws-srvc-scan-persistence
+      securityContext:
+        fsGroup: 185
+      containers:
+        - name: sws-srvc-scan-persistence
+          image: eastnetsdemo/srvc-scan-persistence:5.1.9-oracle
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 185
+          ports:
+            - containerPort: 9180
+          volumeMounts:
+            - name: config-volume
+              mountPath: /home/jboss/config/application.properties
+              subPath: application.properties  
+            - name: log-volume
+              mountPath: /home/jboss/logs
+          env:
+            - name: TZ
+              value: "Asia/Jakarta"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=90"
+          resources:
+            limits:
+              memory: "1024Mi"
+            requests:
+              memory: "512Mi"
+          livenessProbe:
+            tcpSocket:
+              port: 9180
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            tcpSocket:
+              port: 9180
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+      volumes:
+        - name: config-volume
+          configMap:
+            name: sws-srvc-config
+        - name: log-volume
+          persistentVolumeClaim:
+            claimName: logs-sws-scan-persistence-pvc
+
+---
+# Service untuk sws-srvc-scan-persistence
+apiVersion: v1
+kind: Service
+metadata:
+  name: sws-srvc-scan-persistence
+  namespace: sws-kube
+spec:
+  selector:
+    app: sws-srvc-scan-persistence
+  ports:
+    - protocol: TCP
+      port: 8180        # port untuk akses antar pod
+      targetPort: 9180  # port internal container
+  type: ClusterIP
+
+---
+# Deployment service sws-srvc-approval
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sws-srvc-approval
+  namespace: sws-kube
+  labels:
+    app: sws-srvc-approval
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sws-srvc-approval
+  template:
+    metadata:
+      labels:
+        app: sws-srvc-approval
+    spec:
+      hostname: sws-srvc-approval
+      securityContext:
+        fsGroup: 185
+      containers:
+        - name: sws-srvc-approval
+          image: eastnetsdemo/srvc-approval:5.1.9-oracle
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 185
+          ports:
+            - containerPort: 8980
+          volumeMounts:
+            - name: config-volume
+              mountPath: /home/jboss/config/application.properties
+              subPath: application.properties  
+            - name: log-volume
+              mountPath: /home/jboss/logs
+          env:
+            - name: TZ
+              value: "Asia/Jakarta"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=90"
+          resources:
+            limits:
+              memory: "1024Mi"
+            requests:
+              memory: "512Mi"
+          livenessProbe:
+            tcpSocket:
+              port: 8980
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            tcpSocket:
+              port: 8980
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+      volumes:
+        - name: config-volume
+          configMap:
+            name: sws-srvc-config
+        - name: log-volume
+          persistentVolumeClaim:
+            claimName: logs-sws-approval-pvc
+
+---
+# Service untuk sws-srvc-approval
+apiVersion: v1
+kind: Service
+metadata:
+  name: sws-srvc-approval
+  namespace: sws-kube
+spec:
+  selector:
+    app: sws-srvc-approval
+  ports:
+    - protocol: TCP
+      port: 8180        # port akses dalam cluster
+      targetPort: 8980  # port container
+  type: ClusterIP

@@ -1,0 +1,230 @@
+# Namespace untuk mengelompokkan resource Kubernetes
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sws-kube
+
+---
+# PVC untuk logs sws-srvc-license
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-license-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+
+---
+# PVC untuk logs sws-srvc-list
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-list-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+
+---
+# ConfigMap berisi konfigurasi aplikasi sws-license
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sws-srvc-config
+  namespace: sws-kube
+data:
+  application.properties: |
+    zookeeper.connect-string=zookeeper-headless.sws-kube.svc.cluster.local:2181
+    kafka.bootstrap.servers=kafka-headless.sws-kube.svc.cluster.local:9092
+    %oracle.database.jdbc.scdb.url=jdbc:oracle:thin:@192.168.220.70:1521/safewatch
+    %oracle.database.jdbc.filtering.url=jdbc:oracle:thin:@192.168.220.70:1521/safewatch
+    %oracle.quarkus.datasource."scdbPU".username=scdb
+    %oracle.quarkus.datasource."scdbPU".password=47d65070cc33c31965ab8b61faf8078c
+    %oracle.quarkus.datasource."filteringPU".username=swserver
+    %oracle.quarkus.datasource."filteringPU".password=47d65070cc33c31965ab8b61faf8078c
+    %oracle.database.db-kind=oracle
+    %oracle.quarkus.hibernate-orm."filteringPU".log.sql=false
+    %oracle.quarkus.hibernate-orm."scdbPU".log.sql=false
+    quarkus.log.file.enable=true
+    quarkus.log.file.level=INFO
+    quarkus.log.file.rotation.max-file-size=100M
+    quarkus.log.file.rotation.max-backup-index=5
+
+---
+# Deployment service sws-license
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sws-srvc-license
+  namespace: sws-kube
+  labels:
+    app: sws-srvc-license
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sws-srvc-license
+  template:
+    metadata:
+      labels:
+        app: sws-srvc-license
+    spec:
+      hostname: sws-srvc-license
+      securityContext:
+        fsGroup: 185
+      containers:
+        - name: sws-srvc-license
+          image: eastnetsdemo/srvc-license:5.1.9-oracle
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 185
+          ports:
+            - containerPort: 8180
+          volumeMounts:
+            - name: config-volume
+              mountPath: /home/jboss/config/application.properties
+              subPath: application.properties
+            - name: log-volume
+              mountPath: /home/jboss/logs
+          env:
+            - name: TZ
+              value: "Asia/Jakarta"
+            - name: EASTNETS_CONFIG_HOME
+              value: "/etc"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=90"
+          resources:
+            limits:
+              memory: "1024Mi"
+            requests:
+              memory: "512Mi"
+          livenessProbe:
+            tcpSocket:
+              port: 8180
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            tcpSocket:
+              port: 8180
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+      volumes:
+        - name: config-volume
+          configMap:
+            name: sws-srvc-config
+        - name: log-volume
+          persistentVolumeClaim:
+            claimName: logs-sws-license-pvc
+
+---
+# Service untuk sws-srvc-license
+apiVersion: v1
+kind: Service
+metadata:
+  name: sws-srvc-license
+  namespace: sws-kube
+spec:
+  selector:
+    app: sws-srvc-license
+  ports:
+    - protocol: TCP
+      port: 8180         # <-- port yang digunakan untuk akses dari luar (ClusterIP/NodePort/Ingress)
+      targetPort: 8180   # <-- port sebenarnya di dalam container
+  type: ClusterIP
+
+---
+# Deployment service sws-srvc-list
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sws-srvc-list
+  namespace: sws-kube
+  labels:
+    app: sws-srvc-list
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sws-srvc-list
+  template:
+    metadata:
+      labels:
+        app: sws-srvc-list
+    spec:
+      hostname: sws-srvc-list
+      securityContext:
+        fsGroup: 185
+      containers:
+        - name: sws-srvc-list
+          image: eastnetsdemo/srvc-list:5.1.9-oracle
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 185
+          ports:
+            - containerPort: 8480
+          volumeMounts:
+            - name: config-volume
+              mountPath: /home/jboss/config/application.properties
+              subPath: application.properties  
+            - name: log-volume
+              mountPath: /home/jboss/logs
+          env:
+            - name: TZ
+              value: "Asia/Jakarta"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=90"
+          resources:
+            limits:
+              memory: "1024Mi"
+            requests:
+              memory: "512Mi"
+          livenessProbe:
+            tcpSocket:
+              port: 8480
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            tcpSocket:
+              port: 8480
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+      volumes:
+        - name: config-volume
+          configMap:
+            name: sws-srvc-config
+        - name: log-volume
+          persistentVolumeClaim:
+            claimName: logs-sws-list-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sws-srvc-list
+  namespace: sws-kube
+spec:
+  selector:
+    app: sws-srvc-list
+  ports:
+    - protocol: TCP
+      port: 8180        # <-- port yang digunakan untuk akses dari luar (ClusterIP/NodePort/Ingress)
+      targetPort: 8480  # <-- port sebenarnya di dalam container
+  type: ClusterIP
+

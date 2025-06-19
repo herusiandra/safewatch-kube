@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sws-srvc-approval
+  namespace: sws-kube
+spec:
+  selector:
+    app: sws-srvc-approval
+  ports:
+    - protocol: TCP
+      port: 8180        # port akses dalam cluster
+      targetPort: 8180  # port aplikasi di container
+  type: ClusterIP

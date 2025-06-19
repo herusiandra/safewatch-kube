@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sws-srvc-detection
+  namespace: sws-kube
+spec:
+  selector:
+    app: sws-srvc-detection
+  ports:
+    - protocol: TCP
+      port: 8180        # port yang digunakan pod lain untuk akses
+      targetPort: 8180  # port di dalam container
+  type: ClusterIP

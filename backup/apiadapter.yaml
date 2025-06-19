@@ -1,0 +1,105 @@
+# 1. PVC untuk logs sws-apiadapter
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-apiadapter-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+
+---
+
+# 2. Deployment sws-apiadapter
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sws-apiadapter
+  namespace: sws-kube
+  labels:
+    app: sws-apiadapter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sws-apiadapter
+  template:
+    metadata:
+      labels:
+        app: sws-apiadapter
+    spec:
+      hostname: sws-apiadapter
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        fsGroup: 185
+      containers:
+        - name: sws-apiadapter
+          image: eastnetsdemo/apiadapter:5.1.9-oracle
+          imagePullPolicy: IfNotPresent
+          command: ["java"]
+          args:
+            - "-Xmx1g"
+            - "-DlistenerPort=8401"
+            - "-DzkConnectString=zookeeper-headless.sws-kube.svc.cluster.local:2181"
+            - "-DisLegacyHttpFactory=true"
+            - "-jar"
+            - "/usr/bin/srvc-apiadapter.jar"
+          securityContext:
+            runAsUser: 185
+          ports:
+            - containerPort: 8401
+          volumeMounts:
+            - name: log-volume
+              mountPath: /home/jboss/logs
+          env:
+            - name: TZ
+              value: "Asia/Jakarta"
+            - name: EASTNETS_CONFIG_HOME
+              value: "/etc"
+          resources:
+            limits:
+              memory: "1024Mi"
+              cpu: "500m"
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+          livenessProbe:
+            tcpSocket:
+              port: 8401
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            tcpSocket:
+              port: 8401
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+      volumes:
+        - name: log-volume
+          persistentVolumeClaim:
+            claimName: logs-sws-apiadapter-pvc
+
+---
+
+# 3. Service sws-apiadapter
+apiVersion: v1
+kind: Service
+metadata:
+  name: sws-apiadapter
+  namespace: sws-kube
+spec:
+  selector:
+    app: sws-apiadapter
+  ports:
+    - protocol: TCP
+      port: 8401
+      targetPort: 8401
+  type: ClusterIP

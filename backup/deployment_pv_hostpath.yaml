@@ -1,0 +1,151 @@
+---
+# Namespace untuk mengelompokkan resource Kubernetes
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sws-kube
+
+---
+# PersistentVolume untuk menyimpan log service di host path lokal
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: logs-sws-pv
+  labels:
+    type: local
+spec:
+  capacity:
+    storage: 1Gi               # Kapasitas penyimpanan
+  accessModes:
+    - ReadWriteOnce            # Hanya bisa di-mount oleh satu pod sekaligus dalam mode baca/tulis
+  persistentVolumeReclaimPolicy: Retain  # Data tetap disimpan walaupun PVC dihapus
+  hostPath:
+    path: /var/log/swf         # Lokasi direktori log di host
+    type: DirectoryOrCreate    # Buat direktori jika belum ada
+
+---
+# PersistentVolumeClaim untuk mengakses PV logs-sws-pv
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  volumeName: logs-sws-pv
+  storageClassName: ""
+
+---
+# ConfigMap berisi konfigurasi aplikasi sws-license
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sws-srvc-config
+  namespace: sws-kube
+data:
+  application.properties: |    # Konfigurasi ditulis dalam format properties
+    zookeeper.connect-string=zookeeper-headless.sws-kube.svc.cluster.local:2181
+    kafka.bootstrap.servers=kafka-headless.sws-kube.svc.cluster.local:9092
+    %oracle.database.jdbc.scdb.url=jdbc:oracle:thin:@192.168.220.70:1521/safewatch
+    %oracle.database.jdbc.filtering.url=jdbc:oracle:thin:@192.168.220.70:1521/safewatch
+    %oracle.quarkus.datasource."scdbPU".username=scdb
+    %oracle.quarkus.datasource."scdbPU".password=47d65070cc33c31965ab8b61faf8078c
+    %oracle.quarkus.datasource."filteringPU".username=swserver
+    %oracle.quarkus.datasource."filteringPU".password=47d65070cc33c31965ab8b61faf8078c
+    %oracle.database.db-kind=oracle
+    %oracle.quarkus.hibernate-orm."filteringPU".log.sql=false
+    %oracle.quarkus.hibernate-orm."scdbPU".log.sql=false
+    quarkus.log.file.enable=true
+    quarkus.log.file.rotation.max-file-size=100M
+    quarkus.log.file.rotation.max-backup-index=10
+
+---
+# Deployment service sws-license
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sws-license
+  namespace: sws-kube
+  labels:
+    app: sws-license
+spec:
+  replicas: 1                  # Hanya 1 instance/pod
+  selector:
+    matchLabels:
+      app: sws-license
+  template:
+    metadata:
+      labels:
+        app: sws-license
+    spec:
+      hostname: sws-license  # Nama host dalam pod
+      containers:
+        - name: sws-license
+          image: eastnetsdemo/srvc-license:5.1.9-oracle  # Image docker yang digunakan
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8180  # Port aplikasi di dalam container
+          volumeMounts:
+            - name: config-volume
+              mountPath: /home/jboss/config/application.properties
+              subPath: application.properties  # Mount file properti saja, bukan seluruh configMap
+            - name: log-volume
+              mountPath: /home/jboss/logs     # Mount log ke folder container
+          env:
+            - name: TZ
+              value: "Asia/Jakarta"            # Set zona waktu
+            - name: EASTNETS_CONFIG_HOME
+              value: "/etc"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=90" # Batasi pemakaian memori Java agar tidak mengambil semua RAM
+          # Uncomment di bawah jika ingin debugging konfigurasi Quarkus
+          # - name: QUARKUS_LOG_LEVEL
+          #   value: DEBUG
+          # - name: QUARKUS_CONFIG_LOCATION
+          #   value: /home/jboss/config/application.properties
+          resources:
+            limits:
+              memory: "1024Mi"                # Batas maksimal RAM 1GiB
+            requests:
+              memory: "512Mi"                 # Meminta minimal 512MiB RAM
+          livenessProbe:                     # Cek apakah aplikasi masih hidup
+            tcpSocket:
+              port: 8180
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:                    # Cek apakah aplikasi siap menerima trafik
+            tcpSocket:
+              port: 8180
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+      volumes:
+        - name: config-volume
+          configMap:
+            name: sws-srvc-config     # Mount ConfigMap ke pod
+        - name: log-volume
+          persistentVolumeClaim:
+            claimName: logs-sws-pvc           # Mount PVC log ke pod
+
+---
+# Service untuk expose pod sws-license secara internal dalam cluster
+apiVersion: v1
+kind: Service
+metadata:
+  name: sws-license
+  namespace: sws-kube
+spec:
+  selector:
+    app: sws-license     # Pilih pod yang punya label app=sws-license
+  ports:
+    - protocol: TCP
+      port: 8180              # Port service yang bisa diakses dalam cluster
+      targetPort: 8180        # Port pada container
+  type: ClusterIP             # Hanya bisa diakses dari dalam cluster (default)

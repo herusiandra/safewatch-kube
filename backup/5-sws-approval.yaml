@@ -1,0 +1,121 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sws-srvc-config
+  namespace: sws-kube
+data:
+  application.properties: |
+    zookeeper.connect-string=zookeeper-headless.sws-kube.svc.cluster.local:2181
+    kafka.bootstrap.servers=kafka-headless.sws-kube.svc.cluster.local:9092
+    %oracle.database.jdbc.scdb.url=jdbc:oracle:thin:@192.168.220.70:1521/safewatch
+    %oracle.database.jdbc.filtering.url=jdbc:oracle:thin:@192.168.220.70:1521/safewatch
+    %oracle.quarkus.datasource."scdbPU".username=scdb
+    %oracle.quarkus.datasource."scdbPU".password=47d65070cc33c31965ab8b61faf8078c
+    %oracle.quarkus.datasource."filteringPU".username=swserver
+    %oracle.quarkus.datasource."filteringPU".password=47d65070cc33c31965ab8b61faf8078c
+    quarkus.log.file.enable=true
+    quarkus.http.port=8180
+    %oracle.database.db-kind=oracle
+    %oracle.quarkus.hibernate-orm."filteringPU".log.sql=true
+    %oracle.quarkus.hibernate-orm."scdbPU".log.sql=true
+---
+# PVC untuk logs sws-srvc-approval
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-sws-approval-pvc
+  namespace: sws-kube
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: longhorn
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sws-srvc-approval
+  namespace: sws-kube
+  labels:
+    app: sws-srvc-approval
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sws-srvc-approval
+  template:
+    metadata:
+      labels:
+        app: sws-srvc-approval
+    spec:
+      hostname: sws-srvc-approval
+      securityContext:
+        fsGroup: 185
+      containers:
+        - name: sws-srvc-approval
+          image: eastnetsdemo/srvc-approval:5.1.9-oracle
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 185
+          ports:
+            - containerPort: 8180
+          volumeMounts:
+            - name: config-volume
+              mountPath: /home/jboss/config/application.properties
+              subPath: application.properties  
+            - name: log-volume
+              mountPath: /home/jboss/logs
+          env:
+            - name: TZ
+              value: "Asia/Jakarta"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=90"
+          resources:
+            limits:
+              memory: "1024Mi"
+            requests:
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /q/health/live
+              port: 8180
+              scheme: HTTP
+            initialDelaySeconds: 50
+            timeoutSeconds: 1
+            periodSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /q/health/ready
+              port: 8180
+              scheme: HTTP
+            initialDelaySeconds: 50
+            timeoutSeconds: 1
+            periodSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+      volumes:
+        - name: config-volume
+          configMap:
+            name: sws-srvc-config
+        - name: log-volume
+          persistentVolumeClaim:
+            claimName: logs-sws-approval-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sws-srvc-approval
+  namespace: sws-kube
+spec:
+  selector:
+    app: sws-srvc-approval
+  ports:
+    - protocol: TCP
+      port: 8180        # port akses dalam cluster
+      targetPort: 8180  # port aplikasi di container
+  type: ClusterIP
